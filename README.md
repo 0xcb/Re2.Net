@@ -10,6 +10,11 @@
     * [Different in Re2.Net](#different)
     * [Missing from Re2.Net](#missing)
     * [The Rest](#the-rest)
+* [Performance](#performance)    
+    * [Interpreting the Results](#interpreting-the-results)
+    * [First Match](#first-match)
+    * [All Matches](#all-matches)
+
     
 ## Introduction
 
@@ -22,7 +27,7 @@ For a list of things that Re2.Net doesn't support (yet), see [below](#missing).
 
 #### Platforms
 
-Re2.Net targets .NET Framework 3.5 and is compiled using the Visual C++ 2008 runtime, so it has plenty of backwards compatibility for the enterprise environments where .NET is so popular. x86 and x64 platforms are both supported, but because the underlying RE2 library is unmanaged code, each platform requires its own DLL.
+Re2.Net targets .NET Framework 3.5 and is compiled using the Visual C++ 2008 runtime, so it has plenty of backwards compatibility for the enterprise environments where .NET is so popular. x86 and x64 platforms are both supported, but because the underlying RE2 library is unmanaged code, each platform requires its own DLL (this will change to a single DLL at some point).
 
 
 #### License
@@ -45,7 +50,7 @@ Russ Cox, one of the RE2 authors, has written a [stellar series](http://swtch.co
 
 In short, RE2 is automata-driven and uses [NFAs](http://en.wikipedia.org/wiki/Nondeterministic_finite_automaton) and [DFAs](http://en.wikipedia.org/wiki/Deterministic_finite_automaton) to find matches. This method guarantees linear running time and bounded memory consumption, but doesn't support backreferences or generalized assertions (lookahead and lookbehind).
 
-.NET, on the other hand, uses a typical [backtracking](http://www.codinghorror.com/blog/2006/01/regex-performance.html) implementation. This method guarantees neither running time (whence the ``Regex.MatchTimeout`` property) nor memory consumption and can even result in [catastrophic failure](http://en.wikipedia.org/wiki/ReDoS), but it allows for backreferences and generalized assertions.
+.NET, on the other hand, uses a typical [backtracking](http://www.codinghorror.com/blog/2006/01/regex-performance.html) implementation. This method guarantees neither running time (whence the ``Regex.MatchTimeout`` property) nor memory consumption, and can even result in [catastrophic failure](http://en.wikipedia.org/wiki/ReDoS), but it allows for backreferences and generalized assertions.
 
 
 #### <a name="new"/> New in Re2.Net
@@ -89,7 +94,7 @@ In short, RE2 is automata-driven and uses [NFAs](http://en.wikipedia.org/wiki/No
 
 * Re2.Net depends on native code and won't run anywhere that the native code can't run (Silverlight, Mono, etc.).
 
-* Tests. A small C# project is included in the source, but thorough tests haven't been written yet.
+* Tests. A small C# benchmarking project is included in the source, but thorough tests haven't been written yet.
 
  
 #### The Rest
@@ -107,3 +112,67 @@ Debug.Assert(Regex.Matches("xxxx", "")[0].Groups[-1].Value == "");
 var match = Regex.Match("abcd", "abcd");
 Debug.Assert((Group)match == match.Groups[0]);
 ```
+
+
+## Performance
+
+The Re2.Net.Test project pits Re2.Net against .NET Regex where each is strongest: searching strings, for .NET Regex, and for Re2.Net, searching bytes. The testing method is as follows:
+
+* *The Entire Project Gutenberg Works of Mark Twain* (``mtent12.txt``) is loaded as a byte array for Re2.Net and then encoded as a .NET string for .NET Regex.
+* The encoding process isn't included in the measurement, so the comparison shows each library at its best. (In the real world, .NET Regex suffers from having to encode anything that isn't a .NET string, and Re2.Net suffers from having to encode anything that *is* a .NET string.)
+* Performance is measured across 16 regular expressions, taken from [Performance comparison of regular expression engines](http://sljit.sourceforge.net/regex_perf.html) at the the PCRE-sljit project. These expressions aren't pathological -- if anything, they're overly simple.
+* Each expression is tested 11 times (discontinuously, to flush the cache), and then the *median* (not the average) result is used.
+* The test is performed once for finding the first match (``Regex.Match()``) and once for finding all matches (``Regex.Matches()``).
+
+
+#### Interpreting the Results
+
+* ``Twain`` (**First Match**) demonstrates the cost of switching between managed and unmanaged code. Because the first instance of ``Twain`` ends a mere 64 positions into the input, .NET Regex manages to find it before Re2.Net can even call into the underlying RE2 library. Search for ``Twain`` (**All Matches**), on the other hand, and Re2.Net recovers nicely, running twice as fast as .NET Regex.
+* The above pattern repeats itself throughout the **First Match** test, so it's clear that for short inputs, Re2.Net often costs more in unmanaged overhead than it saves in algorithmic efficiency. (Of course, if the cost of encoding bytes into a .NET string is included, Re2.Net routinely wins by a factor of thousands, given an input of this size.)
+* The **All Matches** test confirms that once the duration of a search exceeds Re2.Net's unmanaged overhead, it quickly outpaces .NET Regex, and by significant margins for non-trivial expressions.
+
+**Conclusion**: Re2.Net excels at searching raw data, like files or scraped web pages. But for simple expressions and short inputs, .NET Regex is still the better option (assuming linear running time, bounded memory consumption, and immunity to pathological expressions aren't considerations).
+
+===
+#### First Match
+
+|Regular Expression|Re2.Net|.NET Regex|Winner
+|---|---:|---:|:---:
+<code>Twain</code>|0.05 ms|0.003 ms|.NET Regex by **16.7x**
+<code>^Twain</code>|22 ms|4.7 ms|.NET Regex by **4.6x**
+<code>Twain$</code>|11 ms|26 ms|Re2.Net by **2.4x**
+<code>Huck[a-zA-Z]+&#124;Finn[a-zA-Z]+</code>|20 ms|122 ms|Re2.Net by **6.1x**
+<code>a[^x]{20}b</code>|0.5 ms|0.007 ms|.NET Regex by **69.9x**
+<code>Tom&#124;Sawyer&#124;Huckleberry&#124;Finn</code>|0.2 ms|1.3 ms|Re2.Net by **5.7x**
+<code>.{0,3}(Tom&#124;Sawyer&#124;Huckleberry&#124;Finn)</code>|0.7 ms|20 ms|Re2.Net by **26.2x**
+<code>[a-zA-Z]+ing</code>|0.05 ms|0.05 ms|Re2.Net by **1.1x**
+<code>^[a-zA-Z]{0,4}ing[^a-zA-Z]</code>|0.2 ms|2.3 ms|Re2.Net by **9.6x**
+<code>[a-zA-Z]+ing$</code>|107 ms|7300 ms|Re2.Net by **68.2x**
+<code>^[a-zA-Z ]{5,}$</code>|110 ms|4001 ms|Re2.Net by **36.4x**
+<code>^.{16,20}$</code>|0.4 ms|0.3 ms|.NET Regex by **1.3x**
+<code>([a-f](.[d-m].){0,2}[h-n]){2}</code>|0.2 ms|0.02 ms|.NET Regex by **9.1x**
+<code>([A-Za-z]awyer&#124;[A-Za-z]inn)[^a-zA-Z]</code>|2.9 ms|135 ms|Re2.Net by **46.2x**
+<code>"[^"]{0,30}[?!\.]"</code>|0.8 ms|0.1 ms|.NET Regex by **5.6x**
+<code>Tom.{10,25}river&#124;river.{10,25}Tom</code>|46 ms|332 ms|Re2.Net by **7.2x**
+
+===
+#### All Matches
+
+|Regular Expression|Re2.Net|.NET Regex|Winner
+|---|---:|---:|:---:
+<code>Twain</code>|14 ms|28 ms|Re2.Net by **1.9x**
+<code>^Twain</code>|121 ms|26 ms|.NET Regex by **4.7x**
+<code>Twain$</code>|11 ms|27 ms|Re2.Net by **2.5x**
+<code>Huck[a-zA-Z]+&#124;Finn[a-zA-Z]+</code>|115 ms|651 ms|Re2.Net by **5.7x**
+<code>a[^x]{20}b</code>|578 ms|436 ms|.NET Regex by **1.3x**
+<code>Tom&#124;Sawyer&#124;Huckleberry&#124;Finn</code>|127 ms|689 ms|Re2.Net by **5.4x**
+<code>.{0,3}(Tom&#124;Sawyer&#124;Huckleberry&#124;Finn)</code>|133 ms|21152 ms|Re2.Net by **158.9x**
+<code>[a-zA-Z]+ing</code>|215 ms|7195 ms|Re2.Net by **33.4x**
+<code>^[a-zA-Z]{0,4}ing[^a-zA-Z]</code>|122 ms|3104 ms|Re2.Net by **25.4x**
+<code>[a-zA-Z]+ing$</code>|110 ms|7545 ms|Re2.Net by **68.3x**
+<code>^[a-zA-Z ]{5,}$</code>|114 ms|4129 ms|Re2.Net by **36.3x**
+<code>^.{16,20}$</code>|134 ms|3775 ms|Re2.Net by **28.2x**
+<code>([a-f](.[d-m].){0,2}[h-n]){2}</code>|378 ms|3967 ms|Re2.Net by **10.5x**
+<code>([A-Za-z]awyer&#124;[A-Za-z]inn)[^a-zA-Z]</code>|123 ms|5691 ms|Re2.Net by **46.3x**
+<code>"[^"]{0,30}[?!\.]"</code>|29 ms|188 ms|Re2.Net by **6.4x**
+<code>Tom.{10,25}river&#124;river.{10,25}Tom</code>|123 ms|921 ms|Re2.Net by **7.5x**
