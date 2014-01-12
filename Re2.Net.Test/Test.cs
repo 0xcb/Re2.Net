@@ -77,7 +77,7 @@ namespace Re2.Net.Test
                 var netMedian = testcase.GetNETResultMedian();
                 table.Append(
                     String.Format("\n<code>{0}</code>|{1} ms|{2} ms|{3} by **{4}x**",
-                                   testcase.Pattern.Replace("|", "&#124;"),
+                                   testcase.Pattern.Replace("|", "&#124;").Replace("](", @"]\("),
                                    re2Median.ToString(GetDoubleFormatString(re2Median)),
                                    netMedian.ToString(GetDoubleFormatString(netMedian)),
                                    re2Median > netMedian ? ".NET Regex" : "Re2.Net",

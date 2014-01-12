@@ -150,7 +150,7 @@ The Re2.Net.Test project pits Re2.Net against .NET Regex where each is strongest
 <code>[a-zA-Z]+ing$</code>|107 ms|7300 ms|Re2.Net by **68.2x**
 <code>^[a-zA-Z ]{5,}$</code>|110 ms|4001 ms|Re2.Net by **36.4x**
 <code>^.{16,20}$</code>|0.4 ms|0.3 ms|.NET Regex by **1.3x**
-<code>([a-f](.[d-m].){0,2}[h-n]){2}</code>|0.2 ms|0.02 ms|.NET Regex by **9.1x**
+<code>([a-f]\(.[d-m].){0,2}[h-n]){2}</code>|0.2 ms|0.02 ms|.NET Regex by **9.1x**
 <code>([A-Za-z]awyer&#124;[A-Za-z]inn)[^a-zA-Z]</code>|2.9 ms|135 ms|Re2.Net by **46.2x**
 <code>"[^"]{0,30}[?!\.]"</code>|0.8 ms|0.1 ms|.NET Regex by **5.6x**
 <code>Tom.{10,25}river&#124;river.{10,25}Tom</code>|46 ms|332 ms|Re2.Net by **7.2x**
@@ -172,7 +172,7 @@ The Re2.Net.Test project pits Re2.Net against .NET Regex where each is strongest
 <code>[a-zA-Z]+ing$</code>|110 ms|7545 ms|Re2.Net by **68.3x**
 <code>^[a-zA-Z ]{5,}$</code>|114 ms|4129 ms|Re2.Net by **36.3x**
 <code>^.{16,20}$</code>|134 ms|3775 ms|Re2.Net by **28.2x**
-<code>([a-f](.[d-m].){0,2}[h-n]){2}</code>|378 ms|3967 ms|Re2.Net by **10.5x**
+<code>([a-f]\(.[d-m].){0,2}[h-n]){2}</code>|378 ms|3967 ms|Re2.Net by **10.5x**
 <code>([A-Za-z]awyer&#124;[A-Za-z]inn)[^a-zA-Z]</code>|123 ms|5691 ms|Re2.Net by **46.3x**
 <code>"[^"]{0,30}[?!\.]"</code>|29 ms|188 ms|Re2.Net by **6.4x**
 <code>Tom.{10,25}river&#124;river.{10,25}Tom</code>|123 ms|921 ms|Re2.Net by **7.5x**
