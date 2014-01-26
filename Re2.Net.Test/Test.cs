@@ -12,11 +12,13 @@ namespace Re2.Net.Test
         private class TestCase
         {
             public  string Pattern;
-            public  int    Re2MatchCount = 0;
-            public  int    NETMatchCount = 0;
+            public  int    Re2ByteMatchCount   = 0;
+            public  int    Re2StringMatchCount = 0;
+            public  int    NETMatchCount       = 0;
 
-            private List<double> netResults = new List<double>();
-            private List<double> re2Results = new List<double>();
+            private List<double> netResults       = new List<double>();
+            private List<double> re2ByteResults   = new List<double>();
+            private List<double> re2StringResults = new List<double>();
 
             public TestCase(string pattern)
             {
@@ -28,52 +30,81 @@ namespace Re2.Net.Test
                 netResults.Add(time);
             }
 
-            public void AddRe2Result(double time)
+            public void AddRe2ByteResult(double time)
             {
-                re2Results.Add(time);
+                re2ByteResults.Add(time);
+            }
+
+            public void AddRe2StringResult(double time)
+            {
+                re2StringResults.Add(time);
+            }
+
+            private double getResultMedian(List<double> results)
+            {
+                if(results.Count == 0)
+                    return double.NaN;
+
+                results.Sort();
+
+                if((results.Count & 1) == 1)
+                    return results[results.Count/2];
+                else
+                    return (results[results.Count/2] + results[results.Count/2 - 1]) / 2d;
             }
 
             public double GetNETResultMedian()
             {
-                if(netResults.Count == 0)
-                    return double.NaN;
-
-                netResults.Sort();
-
-                if((netResults.Count & 1) == 1)
-                    return netResults[netResults.Count/2];
-                else
-                    return (netResults[netResults.Count/2] + netResults[netResults.Count/2 - 1]) / 2d;
+                return getResultMedian(netResults);
             }
 
-            public double GetRe2ResultMedian()
+            public double GetRe2ByteResultMedian()
             {
-                if(re2Results.Count == 0)
-                    return double.NaN;
+                return getResultMedian(re2ByteResults);
+            }
 
-                re2Results.Sort();
-
-                if((re2Results.Count & 1) == 1)
-                    return re2Results[re2Results.Count/2];
-                else
-                    return (re2Results[re2Results.Count/2] + re2Results[re2Results.Count/2 - 1]) / 2d;
+            public double GetRe2StringResultMedian()
+            {
+                return getResultMedian(re2StringResults);
             }
 
             public void Reset()
             {
-                Re2MatchCount = 0;
-                NETMatchCount = 0;
-                re2Results    = new List<double>();
-                netResults    = new List<double>();
+                Re2ByteMatchCount   = 0;
+                Re2StringMatchCount = 0;
+                NETMatchCount       = 0;
+                re2ByteResults      = new List<double>();
+                re2StringResults    = new List<double>();
+                netResults          = new List<double>();
             }
         }
 
-        static void PrintResults(TestCase[] testcases)
+        static void PrintByteVsStringResults(TestCase[] testcases)
         {
             var table = new StringBuilder("Regular Expression|Re2.Net|.NET Regex|Winner\n---|---:|---:|:---:");
             foreach(var testcase in testcases)
             {
-                var re2Median = testcase.GetRe2ResultMedian();
+                var re2Median = testcase.GetRe2ByteResultMedian();
+                var netMedian = testcase.GetNETResultMedian();
+                table.Append(
+                    String.Format("\n<code>{0}</code>|{1} ms|{2} ms|{3} by **{4}x**",
+                                   testcase.Pattern.Replace("|", "&#124;").Replace("](", @"]\("),
+                                   re2Median.ToString(GetDoubleFormatString(re2Median)),
+                                   netMedian.ToString(GetDoubleFormatString(netMedian)),
+                                   re2Median > netMedian ? ".NET Regex" : "Re2.Net",
+                                   (re2Median > netMedian ? re2Median/netMedian : netMedian/re2Median).ToString("0.0")
+                    )
+                );
+            }
+            Console.WriteLine(table.ToString());
+        }
+
+        static void PrintStringVsStringResults(TestCase[] testcases)
+        {
+            var table = new StringBuilder("Regular Expression|Re2.Net|.NET Regex|Winner\n---|---:|---:|:---:");
+            foreach(var testcase in testcases)
+            {
+                var re2Median = testcase.GetRe2StringResultMedian();
                 var netMedian = testcase.GetNETResultMedian();
                 table.Append(
                     String.Format("\n<code>{0}</code>|{1} ms|{2} ms|{3} by **{4}x**",
@@ -106,6 +137,8 @@ namespace Re2.Net.Test
         {
             try
             {
+                var iterations = 5;
+
                 var builder  = new StringBuilder();
                 var haybytes = System.IO.File.ReadAllBytes(@"..\..\mtent12.txt");
                 var watch    = new Stopwatch();
@@ -140,7 +173,7 @@ namespace Re2.Net.Test
 
                 Console.Write("Running 'First Match' test..");
 
-                for(int i = 0; i < 11; i++)
+                for(int i = 0; i < iterations; i++)
                     foreach(var testcase in testcases)
                     {
                         Console.Write(".");
@@ -149,8 +182,13 @@ namespace Re2.Net.Test
                         var net = new nn.Regex(testcase.Pattern, nn.RegexOptions.Multiline);
 
                         watch.Start();
-                        var re2Match = re2.Match(haybytes);
-                        testcase.AddRe2Result(TimerTicksToMilliseconds(watch.ElapsedTicks));
+                        var re2ByteMatch = re2.Match(haybytes);
+                        testcase.AddRe2ByteResult(TimerTicksToMilliseconds(watch.ElapsedTicks));
+                        watch.Reset();
+
+                        watch.Start();
+                        var re2StringMatch = re2.Match(haystring);
+                        testcase.AddRe2StringResult(TimerTicksToMilliseconds(watch.ElapsedTicks));
                         watch.Reset();
 
                         watch.Start();
@@ -159,16 +197,18 @@ namespace Re2.Net.Test
                         watch.Reset();
                     }
 
-                Console.WriteLine("\n\nResults: \n\n");
+                Console.WriteLine("\n\nResults:\n\n");
 
-                PrintResults(testcases);
+                PrintByteVsStringResults(testcases);
+                Console.WriteLine("\n");
+                PrintStringVsStringResults(testcases);
 
                 foreach(var testcase in testcases)
                     testcase.Reset();
 
                 Console.Write("\n\nRunning 'All Matches' test..");
 
-                for(int i = 0; i < 11; i++)
+                for(int i = 0; i < iterations; i++)
                     foreach(var testcase in testcases)
                     {
                         Console.Write(".");
@@ -177,10 +217,17 @@ namespace Re2.Net.Test
                         var net = new nn.Regex(testcase.Pattern, nn.RegexOptions.Multiline);
 
                         watch.Start();
-                        var re2Matches = re2.Matches(haybytes);
+                        var re2ByteMatches = re2.Matches(haybytes);
                         // Matches() methods are lazily evaluated.
-                        testcase.Re2MatchCount = re2Matches.Count;
-                        testcase.AddRe2Result(TimerTicksToMilliseconds(watch.ElapsedTicks));
+                        testcase.Re2ByteMatchCount = re2ByteMatches.Count;
+                        testcase.AddRe2ByteResult(TimerTicksToMilliseconds(watch.ElapsedTicks));
+                        watch.Reset();
+
+                        watch.Start();
+                        var re2StringMatches = re2.Matches(haystring);
+                        // Matches() methods are lazily evaluated.
+                        testcase.Re2StringMatchCount = re2StringMatches.Count;
+                        testcase.AddRe2StringResult(TimerTicksToMilliseconds(watch.ElapsedTicks));
                         watch.Reset();
 
                         watch.Start();
@@ -191,9 +238,11 @@ namespace Re2.Net.Test
                         watch.Reset();
                     }
 
-                Console.WriteLine("\n\nResults: \n\n");
+                Console.WriteLine("\n\nResults:\n\n");
 
-                PrintResults(testcases);
+                PrintByteVsStringResults(testcases);
+                Console.WriteLine("\n");
+                PrintStringVsStringResults(testcases);
             }
             catch(Exception ex)
             {

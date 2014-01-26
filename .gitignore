@@ -20,6 +20,8 @@
 *.lib
 *.user
 *.aps
+*.psess
+*.vsp
 bin/
 Re2.Net/re2/lib/x64/debug/
 Re2.Net/re2/lib/x64/release/

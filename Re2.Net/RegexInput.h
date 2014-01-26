@@ -63,16 +63,17 @@ namespace Net
                   _isUtf8(isUtf8),
                   _bytes(nullptr),
                   _handle(nullptr)
-            { }
+            {
+            }
                     
             RegexInput(array<Byte>^ bytes, bool isUtf8)
             {
-                _bytes   = bytes;
-                _handle  = GCHandle::Alloc(bytes, GCHandleType::Pinned);
-                _length  = bytes->Length;
-                _data    = (const char*)_handle->AddrOfPinnedObject().ToPointer();
-                _isUtf8  = isUtf8;
-                _input   = String::Empty;            
+                _bytes  = bytes;
+                _handle = GCHandle::Alloc(bytes, GCHandleType::Pinned);
+                _length = bytes->Length;
+                _data   = (const char*)_handle->AddrOfPinnedObject().ToPointer();
+                _isUtf8 = isUtf8;
+                _input  = String::Empty;
             }
             
             property String^ Input

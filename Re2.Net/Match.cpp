@@ -56,7 +56,7 @@ namespace Net
         if(start > end)
             return Match::Empty;
 
-        return _regex->_match(this->Input, start, end - start);
+        return _regex->_match(this->Input, start, end - start, _index + (_length? _length : 1));
     }
 
     //String^ Match::Result(String^ replacement)

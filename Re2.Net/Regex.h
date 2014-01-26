@@ -448,7 +448,7 @@ namespace Net
 
             internal:
                 
-                _Match^ _match(RegexInput^ input, int startIndex, int length);
+                _Match^ _match(RegexInput^ input, int startIndex, int length, int stringStartIndex);
 
 
             public:

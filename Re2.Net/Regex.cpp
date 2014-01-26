@@ -26,6 +26,7 @@ namespace Net
 
     using System::Collections::Generic::Dictionary;
     using System::Collections::Generic::List;
+    using System::Globalization::StringInfo;
     using System::Text::Encoding;
     using System::Text::StringBuilder;
 
@@ -41,13 +42,72 @@ namespace Net
     
         #pragma region Encoding functions: Do not call directly
 
+        #pragma managed(push, off)
+    
+            /* Optimization of conversion logic to follow. */
+            static StringPiece* stringToUTF8(int* codepoints, int length, int bufsize)
+            {
+                char* encoded = new char[bufsize];
+
+                /* Inspect generated assembly and ensure all div/mod pairs use one instruction. */
+                for(int i = 0, j = 0; i < length; ++i, ++j)
+                {
+                    if(codepoints[i] < 0x0080)
+                        encoded[j] = static_cast<char>(codepoints[i]);
+                    else if(codepoints[i] < 0x0800)
+                    {
+                        encoded[j]   = static_cast<char>(0xc0 + codepoints[i] / 0x40);
+                        encoded[++j] = static_cast<char>(0x80 + codepoints[i] % 0x40);
+                    }
+                    else if(codepoints[i] < 0x10000)
+                    {
+                        encoded[j]   = static_cast<char>(0xe0 + codepoints[i] / 0x1000);
+                        encoded[++j] = static_cast<char>(0x80 + (codepoints[i] % 0x1000) / 0x40);
+                        encoded[++j] = static_cast<char>(0x80 + codepoints[i] % 0x40);
+                    }
+                    else
+                    {
+                        encoded[j]   = static_cast<char>(0xf0 + codepoints[i] / 0x40000);
+                        encoded[++j] = static_cast<char>(0x80 + (codepoints[i] % 0x40000) / 0x1000);
+                        encoded[++j] = static_cast<char>(0x80 + (codepoints[i] % 0x1000) / 0x40);
+                        encoded[++j] = static_cast<char>(0x80 + codepoints[i] % 0x40);
+                    }
+                }
+
+                delete[] codepoints;
+
+                return new StringPiece(encoded, bufsize);
+            }
+
+        #pragma managed(pop)
+
+
         static StringPiece* StringToUTF8(String^ string)
         {
-            array<Byte>^  bytes  = Encoding::UTF8->GetBytes(string);
-            pin_ptr<Byte> pintpr = &bytes[0];
-            char* copy = new char[bytes->Length];
-            memcpy(copy, pintpr, bytes->Length);
-            return new StringPiece(copy, bytes->Length);
+            int  strlength  = string->Length;
+            int* codepoints = new int[strlength];
+            int  bufsize    = 0;
+
+            int c = 0;
+            for(int j = 0; j < strlength; ++c, ++j)
+            {
+                int unit = string[j];
+                if(unit < 0xd800 || unit > 0xdfff)
+                    codepoints[c] = unit;
+                else
+                    codepoints[c] = (unit - 0xd800) * 0x400 + (string[++j] - 0xdc00) + 0x10000;
+
+                if(codepoints[c] < 0x0080)
+                    bufsize++;
+                else if(codepoints[c] < 0x0800)
+                    bufsize += 2;
+                else if(codepoints[c] < 0x10000)
+                    bufsize += 3;
+                else
+                    bufsize += 4;
+            }
+            /* String.Length is wrong if there are surrogate pairs. 'c' is the real length. */
+            return stringToUTF8(codepoints, c, bufsize);
         }
 
 
@@ -123,7 +183,7 @@ namespace Net
             int rv = 0;
             for(int i = 0; i < length; rv++)
                 /* Bits 0xxxxxxx and 11xxxxxx mark the start of a UTF-8 sequence. */
-                if(!(input[rv] & -128) || (input[rv] & -64) == -64)
+                if((input[rv] & -64) != -128)
                     i++;
             return rv - 1; /* Zero-based */
         }
@@ -140,7 +200,7 @@ namespace Net
             int rv = 0;
             for(int i = 0; i < length; i++)
                 /* Bits 0xxxxxxx and 11xxxxxx mark the start of a UTF-8 sequence. */
-                if(!(input[i] & -128) || (input[i] & -64) == -64)
+                if((input[i] & -64) != -128)
                     rv++;
             return rv - 1; /* Zero-based */
         }
@@ -275,7 +335,7 @@ namespace Net
         {
             if(!input)
                 throw gcnew ArgumentNullException("input", "Value cannot be null.");
-            if(startIndex < 0 || startIndex > input->Length)
+            if(startIndex < 0 || startIndex > (gcnew StringInfo(input))->LengthInTextElements)
                 throw gcnew ArgumentOutOfRangeException("startIndex", "Start index cannot be less than 0 or greater than input length.");
 
             StringPiece* sp = ConvertStringEncoding(input, "input", this->Options);
@@ -345,8 +405,13 @@ namespace Net
 
         #pragma region Match
 
-        _Match^ Regex::_match(RegexInput^ input, int startIndex, int length)
+        _Match^ Regex::_match(RegexInput^ input, int startIndex, int length, int stringStartIndex)
         {
+            /*
+             *  stringStartIndex tracks inputIndex for String inputs between matches to avoid recalculating
+             *  in CharToStrPos(), which is prohibitively costly for large inputs.
+             */
+
             int          groupCount = RegexOption::HasAnyFlag(this->Options, RegexOptions::SingleCapture) ? 1 : 1 + _re2->NumberOfCapturingGroups();
             StringPiece* captures   = new StringPiece[groupCount]();
             StringPiece  haystack(input->Data, input->Length);
@@ -357,7 +422,7 @@ namespace Net
                 /* Ignore the encoding of input byte arrays. */
                 bool isUtf8     = input->Bytes ? false : input->IsUTF8;
                 int  charOffset = static_cast<int>(captures[0].data() - haystack.data());
-                int  inputIndex = isUtf8 && charOffset ? CharToStrPos(haystack.data(), charOffset) : charOffset;
+                int  inputIndex = isUtf8 && charOffset ? CharToStrPos(haystack.data() + startIndex, charOffset - startIndex) + stringStartIndex : charOffset;
                 int  capLength  = isUtf8 ? CharToStrPos(captures[0].data(), captures[0].length()) : captures[0].length();
 
                 rv          = gcnew _Match(this, groupCount, input, inputIndex, capLength, charOffset + captures[0].length());
@@ -376,7 +441,7 @@ namespace Net
                          *  they will be the same if the input is a Byte array, or if the Regex is ASCII or Latin-1.
                          */
                         charOffset = static_cast<int>(captures[i].data() - haystack.data());
-                        inputIndex = isUtf8 && charOffset ? CharToStrPos(haystack.data(), charOffset) : charOffset;
+                        inputIndex = isUtf8 && charOffset ? CharToStrPos(haystack.data() + startIndex, charOffset - startIndex) + stringStartIndex : charOffset;
                         capLength  = isUtf8 ? CharToStrPos(captures[i].data(), captures[i].length()) : captures[i].length();
 
                         groups[i] = gcnew Group(input, inputIndex, capLength);
@@ -392,13 +457,14 @@ namespace Net
 
         _Match^ Regex::Match(String^ input, int startIndex, int length)
         {
+            int inputlength = (gcnew StringInfo(input))->LengthInTextElements;
             if(!input)
                 throw gcnew ArgumentNullException("input", "Value cannot be null.");
-            if(startIndex < 0 || startIndex > input->Length)
+            if(startIndex < 0 || startIndex > inputlength)
                 throw gcnew ArgumentOutOfRangeException("startIndex", "Start index cannot be less than 0 or greater than input length.");
-            if(length < 0 || length > input->Length)
+            if(length < 0 || length > inputlength)
                 throw gcnew ArgumentOutOfRangeException("length", "Length cannot be less than 0 or greater than input length.");
-            if(startIndex + length - 1 > input->Length)
+            if(startIndex + length - 1 > inputlength)
                 throw gcnew ArgumentOutOfRangeException("startIndex, length", "Start index and length combined cannot be greater than input length.");
 
             /* If in UTF-8 mode, convert the start and length values from String^ to char* offset. */
@@ -413,7 +479,7 @@ namespace Net
                 if(length)     length     = StrToCharPos(sp->data() + startIndex, length);
             }
 
-            return this->_match(ri, startIndex, length);
+            return this->_match(ri, startIndex, length, 0);
         }
 
 
@@ -431,13 +497,13 @@ namespace Net
             RegexInput^ ri = gcnew RegexInput(input, !RegexOption::HasAnyFlag(this->Options, SINGLE_BYTE_ENCODING));
 
             /* Unicode hijinks aren't required for byte arrays. */
-            return this->_match(ri, startIndex, length);
+            return this->_match(ri, startIndex, length, 0);
         }
 
 
         _Match^ Regex::Match(String^ input, int startIndex)
         {
-            return this->Match(input, startIndex, input->Length - startIndex);
+            return this->Match(input, startIndex, (gcnew StringInfo(input))->LengthInTextElements - startIndex);
         }
 
 
@@ -449,7 +515,7 @@ namespace Net
 
         _Match^ Regex::Match(String^ input)
         {
-            return this->Match(input, 0, input->Length);
+            return this->Match(input, 0, (gcnew StringInfo(input))->LengthInTextElements);
         }
 
 
@@ -489,7 +555,7 @@ namespace Net
 
         MatchCollection^ Regex::Matches(String^ input, int startIndex)
         {
-            return gcnew MatchCollection(this->Match(input, startIndex, input->Length - startIndex));
+            return gcnew MatchCollection(this->Match(input, startIndex, (gcnew StringInfo(input))->LengthInTextElements - startIndex));
         }
 
 
@@ -501,7 +567,7 @@ namespace Net
 
         MatchCollection^ Regex::Matches(String^ input)
         {
-            return gcnew MatchCollection(this->Match(input, 0, input->Length));
+            return gcnew MatchCollection(this->Match(input, 0, (gcnew StringInfo(input))->LengthInTextElements));
         }
 
 
@@ -513,7 +579,7 @@ namespace Net
 
         MatchCollection^ Regex::Matches(String^ input, String^ pattern, RegexOptions options)
         {
-            return gcnew MatchCollection(Cache::FindOrCreate(pattern, options)->Match(input, 0, input->Length));
+            return gcnew MatchCollection(Cache::FindOrCreate(pattern, options)->Match(input, 0, (gcnew StringInfo(input))->LengthInTextElements));
         }
 
 
@@ -525,7 +591,7 @@ namespace Net
 
         MatchCollection^ Regex::Matches(String^ input, String^ pattern)
         {
-            return gcnew MatchCollection(Cache::FindOrCreate(pattern, RegexOptions::None)->Match(input, 0, input->Length));
+            return gcnew MatchCollection(Cache::FindOrCreate(pattern, RegexOptions::None)->Match(input, 0, (gcnew StringInfo(input))->LengthInTextElements));
         }
 
 
