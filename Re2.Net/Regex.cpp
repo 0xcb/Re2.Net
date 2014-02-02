@@ -7,6 +7,9 @@
 #pragma once
 
 #pragma managed(push, off)
+    #include <stdlib.h>
+    #include <malloc.h>
+    #include <errno.h>
     #include "re2\src\re2.h"
     #include "re2\src\stringpiece.h"
 #pragma managed(pop)
@@ -42,72 +45,52 @@ namespace Net
     
         #pragma region Encoding functions: Do not call directly
 
-        #pragma managed(push, off)
-    
-            /* Optimization of conversion logic to follow. */
-            static StringPiece* stringToUTF8(int* codepoints, int length, int bufsize)
-            {
-                char* encoded = new char[bufsize];
-
-                /* Inspect generated assembly and ensure all div/mod pairs use one instruction. */
-                for(int i = 0, j = 0; i < length; ++i, ++j)
-                {
-                    if(codepoints[i] < 0x0080)
-                        encoded[j] = static_cast<char>(codepoints[i]);
-                    else if(codepoints[i] < 0x0800)
-                    {
-                        encoded[j]   = static_cast<char>(0xc0 + codepoints[i] / 0x40);
-                        encoded[++j] = static_cast<char>(0x80 + codepoints[i] % 0x40);
-                    }
-                    else if(codepoints[i] < 0x10000)
-                    {
-                        encoded[j]   = static_cast<char>(0xe0 + codepoints[i] / 0x1000);
-                        encoded[++j] = static_cast<char>(0x80 + (codepoints[i] % 0x1000) / 0x40);
-                        encoded[++j] = static_cast<char>(0x80 + codepoints[i] % 0x40);
-                    }
-                    else
-                    {
-                        encoded[j]   = static_cast<char>(0xf0 + codepoints[i] / 0x40000);
-                        encoded[++j] = static_cast<char>(0x80 + (codepoints[i] % 0x40000) / 0x1000);
-                        encoded[++j] = static_cast<char>(0x80 + (codepoints[i] % 0x1000) / 0x40);
-                        encoded[++j] = static_cast<char>(0x80 + codepoints[i] % 0x40);
-                    }
-                }
-
-                delete[] codepoints;
-
-                return new StringPiece(encoded, bufsize);
-            }
-
-        #pragma managed(pop)
-
-
+        /* Optimization of conversion logic to follow. */
         static StringPiece* StringToUTF8(String^ string)
         {
-            int  strlength  = string->Length;
-            int* codepoints = new int[strlength];
-            int  bufsize    = 0;
+            int   strlength = string->Length;
+            char* encoded   = static_cast<char*>(malloc(strlength * sizeof(Char)));
+            if(ENOMEM == errno)
+                throw gcnew OutOfMemoryException();
 
-            int c = 0;
-            for(int j = 0; j < strlength; ++c, ++j)
+            int bufsize = 0;
+            for(int i = 0; i < strlength; ++i, ++bufsize)
             {
-                int unit = string[j];
-                if(unit < 0xd800 || unit > 0xdfff)
-                    codepoints[c] = unit;
+                int codeunit = string[i];
+                int codepoint;
+                if(codeunit < 0xd800 || codeunit > 0xdfff)
+                    codepoint = codeunit;
                 else
-                    codepoints[c] = (unit - 0xd800) * 0x400 + (string[++j] - 0xdc00) + 0x10000;
+                    codepoint = (codeunit - 0xd800) * 0x400 + (string[++i] - 0xdc00) + 0x10000;
 
-                if(codepoints[c] < 0x0080)
-                    bufsize++;
-                else if(codepoints[c] < 0x0800)
-                    bufsize += 2;
-                else if(codepoints[c] < 0x10000)
-                    bufsize += 3;
+                if(codepoint < 0x0080)
+                    encoded[bufsize] = static_cast<char>(codepoint);
+                else if(codepoint < 0x0800)
+                {
+                    encoded[bufsize]   = static_cast<char>(0xc0 + codepoint / 0x40);
+                    encoded[++bufsize] = static_cast<char>(0x80 + codepoint % 0x40);
+                }
+                else if(codepoint < 0x10000)
+                {
+                    encoded[bufsize]   = static_cast<char>(0xe0 + codepoint / 0x1000);
+                    encoded[++bufsize] = static_cast<char>(0x80 + (codepoint % 0x1000) / 0x40);
+                    encoded[++bufsize] = static_cast<char>(0x80 + codepoint % 0x40);
+                }
                 else
-                    bufsize += 4;
+                {
+                    encoded[bufsize]   = static_cast<char>(0xf0 + codepoint / 0x40000);
+                    encoded[++bufsize] = static_cast<char>(0x80 + (codepoint % 0x40000) / 0x1000);
+                    encoded[++bufsize] = static_cast<char>(0x80 + (codepoint % 0x1000) / 0x40);
+                    encoded[++bufsize] = static_cast<char>(0x80 + codepoint % 0x40);
+                }
             }
-            /* String.Length is wrong if there are surrogate pairs. 'c' is the real length. */
-            return stringToUTF8(codepoints, c, bufsize);
+
+            /* The memory block shouldn't need to be moved, but it's possible. */
+            encoded = static_cast<char*>(realloc(encoded, bufsize));
+            if(ENOMEM == errno)
+                throw gcnew OutOfMemoryException();
+
+            return new StringPiece(encoded, bufsize);
         }
 
 
@@ -117,7 +100,9 @@ namespace Net
             if(string != Encoding::ASCII->GetString(bytes))
                 throw gcnew ArgumentOutOfRangeException(argument, "Specified argument was out of the range of valid ASCII values.");
             pin_ptr<Byte> pintpr = &bytes[0];
-            char* copy = new char[bytes->Length];
+            char* copy = static_cast<char*>(malloc(bytes->Length));
+            if(ENOMEM == errno)
+                throw gcnew OutOfMemoryException();
             memcpy(copy, pintpr, bytes->Length);
             return new StringPiece(copy, bytes->Length);
         }
@@ -137,7 +122,9 @@ namespace Net
             if(string != Latin1->GetString(bytes))
                 throw gcnew ArgumentOutOfRangeException(argument, "Specified argument was out of the range of valid Latin-1 values.");
             pin_ptr<Byte> pintpr = &bytes[0];
-            char* copy = new char[bytes->Length];
+            char* copy = static_cast<char*>(malloc(bytes->Length));
+            if(ENOMEM == errno)
+                throw gcnew OutOfMemoryException();
             memcpy(copy, pintpr, bytes->Length);
             return new StringPiece(copy, bytes->Length);
         }
@@ -159,7 +146,7 @@ namespace Net
         {
             /* I'd love to hear a good argument for why regex supports empty patterns and inputs. */
             if(!string->Length)
-                return new StringPiece(new char[0], 0);
+                return new StringPiece(static_cast<char*>(malloc(0)), 0);
 
             /* Latin1 overrides ASCII if both are set. */
             return RegexOption::HasAnyFlag(options, RegexOptions::Latin1) ? StringToLatin1(string, source) :
@@ -318,8 +305,8 @@ namespace Net
             if(map.count(str))
                 rv = map[str];
 
-            delete[] sp->data();
-            delete   sp;
+            free(const_cast<char*>(sp->data()));
+            delete sp;
 
             return rv;
         }
@@ -341,8 +328,8 @@ namespace Net
             StringPiece* sp = ConvertStringEncoding(input, "input", this->Options);
             bool         rv = _re2->Match(*sp, startIndex, sp->length(), RE2::UNANCHORED, NULL, 0);
             
-            delete[] sp->data();
-            delete   sp;
+            free(const_cast<char*>(sp->data()));
+            delete sp;
             
             return rv;
         }
@@ -685,8 +672,8 @@ namespace Net
              */
             StringPiece* regex = ConvertStringEncoding(pattern, "pattern", options);
             _re2 = new RE2(*regex, settings);
-            delete[] regex->data();
-            delete   regex;
+            free(const_cast<char*>(regex->data()));
+            delete regex;
 
             if(!_re2->ok())
                 throw gcnew ArgumentException(String::Format("{0}: '{1}' in pattern '{2}'.",

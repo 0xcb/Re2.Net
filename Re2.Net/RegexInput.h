@@ -6,6 +6,10 @@
 
 #pragma once
 
+#pragma managed(push, off)
+    #include <stdlib.h>
+    #include <malloc.h>
+#pragma managed(pop)
 
 namespace Re2
 {
@@ -114,7 +118,7 @@ namespace Net
                 if(_handle)
                     _handle->Free();
                 else
-                    delete[] _data;
+                    free(const_cast<char*>(_data));
             }
     };
 }

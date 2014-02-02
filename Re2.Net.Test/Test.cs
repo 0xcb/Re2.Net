@@ -195,6 +195,11 @@ namespace Re2.Net.Test
                         var netMatch = net.Match(haystring);
                         testcase.AddNETResult(TimerTicksToMilliseconds(watch.ElapsedTicks));
                         watch.Reset();
+
+                        Debug.Assert(re2ByteMatch.Value == re2StringMatch.Value);
+                        Debug.Assert(re2ByteMatch.Value == netMatch.Value);
+                        Debug.Assert(re2StringMatch.Index == netMatch.Index);
+                        Debug.Assert(re2StringMatch.Length == netMatch.Length);
                     }
 
                 Console.WriteLine("\n\nResults:\n\n");
@@ -236,6 +241,9 @@ namespace Re2.Net.Test
                         testcase.NETMatchCount = netMatches.Count;
                         testcase.AddNETResult(TimerTicksToMilliseconds(watch.ElapsedTicks));
                         watch.Reset();
+
+                        Debug.Assert(re2ByteMatches.Count == re2StringMatches.Count);
+                        Debug.Assert(re2ByteMatches.Count == netMatches.Count);
                     }
 
                 Console.WriteLine("\n\nResults:\n\n");
