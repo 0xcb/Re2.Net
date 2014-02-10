@@ -186,41 +186,41 @@ Regular Expression|Re2.Net|.NET Regex|Winner
 
 Regular Expression|Re2.Net|.NET Regex|Winner
 ---|---:|---:|:---:
-<code>Twain</code>|2192 ms|0.009 ms|.NET Regex by **236170.4x**
-<code>^Twain</code>|2175 ms|5 ms|.NET Regex by **412.2x**
-<code>Twain$</code>|2257 ms|32 ms|.NET Regex by **70.3x**
-<code>Huck[a-zA-Z]+&#124;Finn[a-zA-Z]+</code>|2202 ms|118 ms|.NET Regex by **18.7x**
-<code>a[^x]{20}b</code>|2194 ms|0.01 ms|.NET Regex by **175800.2x**
-<code>Tom&#124;Sawyer&#124;Huckleberry&#124;Finn</code>|2124 ms|1.2 ms|.NET Regex by **1795.1x**
-<code>.{0,3}(Tom&#124;Sawyer&#124;Huckleberry&#124;Finn)</code>|2226 ms|23 ms|.NET Regex by **95.6x**
-<code>[a-zA-Z]+ing</code>|2140 ms|0.06 ms|.NET Regex by **35565.2x**
-<code>^[a-zA-Z]{0,4}ing[^a-zA-Z]</code>|2152 ms|1.8 ms|.NET Regex by **1167.0x**
-<code>[a-zA-Z]+ing$</code>|2383 ms|7444 ms|Re2.Net by **3.1x**
-<code>^[a-zA-Z ]{5,}$</code>|2332 ms|3529 ms|Re2.Net by **1.5x**
-<code>^.{16,20}$</code>|2164 ms|0.3 ms|.NET Regex by **8371.2x**
-<code>([a-f]\(.[d-m].){0,2}[h-n]){2}</code>|2262 ms|0.03 ms|.NET Regex by **75996.7x**
-<code>([A-Za-z]awyer&#124;[A-Za-z]inn)[^a-zA-Z]</code>|2203 ms|138 ms|.NET Regex by **16.0x**
-<code>"[^"]{0,30}[?!\.]"</code>|2161 ms|0.2 ms|.NET Regex by **12574.1x**
-<code>Tom.{10,25}river&#124;river.{10,25}Tom</code>|2301 ms|322 ms|.NET Regex by **7.2x**
+<code>Twain</code>|108 ms|0.010 ms|.NET Regex by **11290.9x**
+<code>^Twain</code>|136 ms|5 ms|.NET Regex by **25.5x**
+<code>Twain$</code>|141 ms|28 ms|.NET Regex by **5.0x**
+<code>Huck[a-zA-Z]+&#124;Finn[a-zA-Z]+</code>|137 ms|122 ms|.NET Regex by **1.1x**
+<code>a[^x]{20}b</code>|110 ms|0.01 ms|.NET Regex by **8826.6x**
+<code>Tom&#124;Sawyer&#124;Huckleberry&#124;Finn</code>|111 ms|1.2 ms|.NET Regex by **92.3x**
+<code>.{0,3}(Tom&#124;Sawyer&#124;Huckleberry&#124;Finn)</code>|106 ms|23 ms|.NET Regex by **4.7x**
+<code>[a-zA-Z]+ing</code>|112 ms|0.06 ms|.NET Regex by **1861.7x**
+<code>^[a-zA-Z]{0,4}ing[^a-zA-Z]</code>|108 ms|1.8 ms|.NET Regex by **58.6x**
+<code>[a-zA-Z]+ing$</code>|237 ms|7101 ms|Re2.Net by **30.0x**
+<code>^[a-zA-Z ]{5,}$</code>|230 ms|3431 ms|Re2.Net by **14.9x**
+<code>^.{16,20}$</code>|109 ms|0.3 ms|.NET Regex by **417.2x**
+<code>([a-f]\(.[d-m].){0,2}[h-n]){2}</code>|108 ms|0.04 ms|.NET Regex by **2859.1x**
+<code>([A-Za-z]awyer&#124;[A-Za-z]inn)[^a-zA-Z]</code>|114 ms|145 ms|Re2.Net by **1.3x**
+<code>"[^"]{0,30}[?!\.]"</code>|107 ms|0.2 ms|.NET Regex by **608.6x**
+<code>Tom.{10,25}river&#124;river.{10,25}Tom</code>|181 ms|323 ms|Re2.Net by **1.8x**
 
 ===
 #### All Matches (Strings)
 
 Regular Expression|Re2.Net|.NET Regex|Winner
 ---|---:|---:|:---:
-<code>Twain</code>|2229 ms|30 ms|.NET Regex by **73.8x**
-<code>^Twain</code>|2332 ms|45 ms|.NET Regex by **51.6x**
-<code>Twain$</code>|2259 ms|28 ms|.NET Regex by **79.9x**
-<code>Huck[a-zA-Z]+&#124;Finn[a-zA-Z]+</code>|2302 ms|712 ms|.NET Regex by **3.2x**
-<code>a[^x]{20}b</code>|3147 ms|386 ms|.NET Regex by **8.1x**
-<code>Tom&#124;Sawyer&#124;Huckleberry&#124;Finn</code>|2371 ms|794 ms|.NET Regex by **3.0x**
-<code>.{0,3}(Tom&#124;Sawyer&#124;Huckleberry&#124;Finn)</code>|2387 ms|27178 ms|Re2.Net by **11.4x**
-<code>[a-zA-Z]+ing</code>|2594 ms|7326 ms|Re2.Net by **2.8x**
-<code>^[a-zA-Z]{0,4}ing[^a-zA-Z]</code>|2296 ms|2726 ms|Re2.Net by **1.2x**
-<code>[a-zA-Z]+ing$</code>|2370 ms|7510 ms|Re2.Net by **3.2x**
-<code>^[a-zA-Z ]{5,}$</code>|2422 ms|3854 ms|Re2.Net by **1.6x**
-<code>^.{16,20}$</code>|2346 ms|3117 ms|Re2.Net by **1.3x**
-<code>([a-f]\(.[d-m].){0,2}[h-n]){2}</code>|2533 ms|4470 ms|Re2.Net by **1.8x**
-<code>([A-Za-z]awyer&#124;[A-Za-z]inn)[^a-zA-Z]</code>|2302 ms|6070 ms|Re2.Net by **2.6x**
-<code>"[^"]{0,30}[?!\.]"</code>|2309 ms|222 ms|.NET Regex by **10.4x**
-<code>Tom.{10,25}river&#124;river.{10,25}Tom</code>|2279 ms|897 ms|.NET Regex by **2.5x**
+<code>Twain</code>|188 ms|30 ms|.NET Regex by **6.3x**
+<code>^Twain</code>|276 ms|28 ms|.NET Regex by **9.8x**
+<code>Twain$</code>|130 ms|29 ms|.NET Regex by **4.5x**
+<code>Huck[a-zA-Z]+&#124;Finn[a-zA-Z]+</code>|265 ms|648 ms|Re2.Net by **2.4x**
+<code>a[^x]{20}b</code>|811 ms|385 ms|.NET Regex by **2.1x**
+<code>Tom&#124;Sawyer&#124;Huckleberry&#124;Finn</code>|269 ms|711 ms|Re2.Net by **2.6x**
+<code>.{0,3}(Tom&#124;Sawyer&#124;Huckleberry&#124;Finn)</code>|320 ms|24299 ms|Re2.Net by **75.9x**
+<code>[a-zA-Z]+ing</code>|378 ms|6870 ms|Re2.Net by **18.2x**
+<code>^[a-zA-Z]{0,4}ing[^a-zA-Z]</code>|285 ms|2495 ms|Re2.Net by **8.8x**
+<code>[a-zA-Z]+ing$</code>|226 ms|7070 ms|Re2.Net by **31.3x**
+<code>^[a-zA-Z ]{5,}$</code>|221 ms|3397 ms|Re2.Net by **15.4x**
+<code>^.{16,20}$</code>|284 ms|2982 ms|Re2.Net by **10.5x**
+<code>([a-f]\(.[d-m].){0,2}[h-n]){2}</code>|634 ms|4350 ms|Re2.Net by **6.9x**
+<code>([A-Za-z]awyer&#124;[A-Za-z]inn)[^a-zA-Z]</code>|313 ms|5613 ms|Re2.Net by **17.9x**
+<code>"[^"]{0,30}[?!\.]"</code>|196 ms|209 ms|Re2.Net by **1.1x**
+<code>Tom.{10,25}river&#124;river.{10,25}Tom</code>|251 ms|882 ms|Re2.Net by **3.5x**

@@ -14,6 +14,7 @@
     #include "re2\src\stringpiece.h"
 #pragma managed(pop)
 
+#include <vcclr.h>
 #include "Regex.h"
 #include "RegexOptions.h"
 #include "RegexInput.h"
@@ -45,52 +46,65 @@ namespace Net
     
         #pragma region Encoding functions: Do not call directly
 
-        /* Optimization of conversion logic to follow. */
-        static StringPiece* StringToUTF8(String^ string)
-        {
-            int   strlength = string->Length;
-            char* encoded   = static_cast<char*>(malloc(strlength * sizeof(Char)));
-            if(ENOMEM == errno)
-                throw gcnew OutOfMemoryException();
+        #pragma managed(push, off)
 
-            int bufsize = 0;
-            for(int i = 0; i < strlength; ++i, ++bufsize)
+            static StringPiece* stringToUTF8(const wchar_t* chars, int length)
             {
-                int codeunit = string[i];
-                int codepoint;
-                if(codeunit < 0xd800 || codeunit > 0xdfff)
-                    codepoint = codeunit;
-                else
-                    codepoint = (codeunit - 0xd800) * 0x400 + (string[++i] - 0xdc00) + 0x10000;
+                char* encoded = static_cast<char*>(malloc(length * sizeof(wchar_t)));
+                if(ENOMEM == errno)
+                    return nullptr;
 
-                if(codepoint < 0x0080)
-                    encoded[bufsize] = static_cast<char>(codepoint);
-                else if(codepoint < 0x0800)
+                int bufsize = 0;
+                for(int i = 0; i < length; ++i, ++bufsize)
                 {
-                    encoded[bufsize]   = static_cast<char>(0xc0 + codepoint / 0x40);
-                    encoded[++bufsize] = static_cast<char>(0x80 + codepoint % 0x40);
+                    wchar_t unitsub = chars[i] - 0xd800;
+                    int     codepoint;
+
+                    if(!((unsigned)unitsub <= 0xdfff - 0xd800))
+                        codepoint = chars[i];
+                    else
+                        codepoint = unitsub * 0x400 + chars[++i] + 0x2400;
+
+                    if(codepoint < 0x0080)
+                        encoded[bufsize] = static_cast<char>(codepoint);
+                    else if(codepoint < 0x0800)
+                    {
+                        encoded[bufsize]   = static_cast<char>(0xc0 + codepoint / 0x40);
+                        encoded[++bufsize] = static_cast<char>(0x80 + codepoint % 0x40);
+                    }
+                    else if(codepoint < 0x10000)
+                    {
+                        encoded[bufsize]   = static_cast<char>(0xe0 + codepoint / 0x1000);
+                        encoded[++bufsize] = static_cast<char>(0x80 + (codepoint % 0x1000) / 0x40);
+                        encoded[++bufsize] = static_cast<char>(0x80 + codepoint % 0x40);
+                    }
+                    else
+                    {
+                        encoded[bufsize]   = static_cast<char>(0xf0 + codepoint / 0x40000);
+                        encoded[++bufsize] = static_cast<char>(0x80 + (codepoint % 0x40000) / 0x1000);
+                        encoded[++bufsize] = static_cast<char>(0x80 + (codepoint % 0x1000) / 0x40);
+                        encoded[++bufsize] = static_cast<char>(0x80 + codepoint % 0x40);
+                    }
                 }
-                else if(codepoint < 0x10000)
-                {
-                    encoded[bufsize]   = static_cast<char>(0xe0 + codepoint / 0x1000);
-                    encoded[++bufsize] = static_cast<char>(0x80 + (codepoint % 0x1000) / 0x40);
-                    encoded[++bufsize] = static_cast<char>(0x80 + codepoint % 0x40);
-                }
-                else
-                {
-                    encoded[bufsize]   = static_cast<char>(0xf0 + codepoint / 0x40000);
-                    encoded[++bufsize] = static_cast<char>(0x80 + (codepoint % 0x40000) / 0x1000);
-                    encoded[++bufsize] = static_cast<char>(0x80 + (codepoint % 0x1000) / 0x40);
-                    encoded[++bufsize] = static_cast<char>(0x80 + codepoint % 0x40);
-                }
+
+                /* The memory block shouldn't need to be moved, but it's possible. */
+                encoded = static_cast<char*>(realloc(encoded, bufsize));
+                if(ENOMEM == errno)
+                    return nullptr;
+
+                return new StringPiece(encoded, bufsize);
             }
 
-            /* The memory block shouldn't need to be moved, but it's possible. */
-            encoded = static_cast<char*>(realloc(encoded, bufsize));
-            if(ENOMEM == errno)
-                throw gcnew OutOfMemoryException();
+        #pragma managed(pop)
 
-            return new StringPiece(encoded, bufsize);
+
+        static StringPiece* StringToUTF8(String^ string)
+        {
+            pin_ptr<const wchar_t> chars      = PtrToStringChars(string);
+            StringPiece*           converted = stringToUTF8(chars, string->Length);
+            if(!converted)
+                throw gcnew OutOfMemoryException();
+            return converted;
         }
 
 
@@ -99,11 +113,11 @@ namespace Net
             array<Byte>^ bytes = Encoding::ASCII->GetBytes(string);
             if(string != Encoding::ASCII->GetString(bytes))
                 throw gcnew ArgumentOutOfRangeException(argument, "Specified argument was out of the range of valid ASCII values.");
-            pin_ptr<Byte> pintpr = &bytes[0];
+            pin_ptr<Byte> pinptr = &bytes[0];
             char* copy = static_cast<char*>(malloc(bytes->Length));
             if(ENOMEM == errno)
                 throw gcnew OutOfMemoryException();
-            memcpy(copy, pintpr, bytes->Length);
+            memcpy(copy, pinptr, bytes->Length);
             return new StringPiece(copy, bytes->Length);
         }
 
@@ -121,11 +135,11 @@ namespace Net
             array<Byte>^ bytes  = Latin1->GetBytes(string);
             if(string != Latin1->GetString(bytes))
                 throw gcnew ArgumentOutOfRangeException(argument, "Specified argument was out of the range of valid Latin-1 values.");
-            pin_ptr<Byte> pintpr = &bytes[0];
+            pin_ptr<Byte> pinptr = &bytes[0];
             char* copy = static_cast<char*>(malloc(bytes->Length));
             if(ENOMEM == errno)
                 throw gcnew OutOfMemoryException();
-            memcpy(copy, pintpr, bytes->Length);
+            memcpy(copy, pinptr, bytes->Length);
             return new StringPiece(copy, bytes->Length);
         }
 
@@ -159,6 +173,8 @@ namespace Net
 
     #pragma region Encoding length functions
 
+        #pragma managed(push, off)
+
         /*
          *  Counts the number of chars in a UTF-8 sequence. This is necessary because the
          *  Index of a Capture, Group, or Match is reported in terms of the entire input,
@@ -170,8 +186,13 @@ namespace Net
             int rv = 0;
             for(int i = 0; i < length; rv++)
                 /* Bits 0xxxxxxx and 11xxxxxx mark the start of a UTF-8 sequence. */
-                if((input[rv] & -64) != -128)
+                if((input[rv] & 0xc0) != 0x80)
+                {
                     i++;
+                    /* The code point is outside the BMP (UTF-16 surrogate pair). */
+                    if((unsigned)input[i] >= 0xf0)
+                        i++;
+                }
             return rv - 1; /* Zero-based */
         }
         
@@ -187,10 +208,17 @@ namespace Net
             int rv = 0;
             for(int i = 0; i < length; i++)
                 /* Bits 0xxxxxxx and 11xxxxxx mark the start of a UTF-8 sequence. */
-                if((input[i] & -64) != -128)
+                if((input[rv] & 0xc0) != 0x80)
+                {
                     rv++;
+                    /* The code point is outside the BMP (UTF-16 surrogate pair). */
+                    if((unsigned)input[i] >= 0xf0)
+                        rv++;
+                }
             return rv - 1; /* Zero-based */
         }
+
+        #pragma managed(pop)
 
     #pragma endregion
 
@@ -322,7 +350,7 @@ namespace Net
         {
             if(!input)
                 throw gcnew ArgumentNullException("input", "Value cannot be null.");
-            if(startIndex < 0 || startIndex > (gcnew StringInfo(input))->LengthInTextElements)
+            if(startIndex < 0 || startIndex > input->Length)
                 throw gcnew ArgumentOutOfRangeException("startIndex", "Start index cannot be less than 0 or greater than input length.");
 
             StringPiece* sp = ConvertStringEncoding(input, "input", this->Options);
@@ -427,6 +455,7 @@ namespace Net
                          *  Match tracks the char offset and String index separately in case of UTF-8 String input, but
                          *  they will be the same if the input is a Byte array, or if the Regex is ASCII or Latin-1.
                          */
+
                         charOffset = static_cast<int>(captures[i].data() - haystack.data());
                         inputIndex = isUtf8 && charOffset ? CharToStrPos(haystack.data() + startIndex, charOffset - startIndex) + stringStartIndex : charOffset;
                         capLength  = isUtf8 ? CharToStrPos(captures[i].data(), captures[i].length()) : captures[i].length();
@@ -444,14 +473,14 @@ namespace Net
 
         _Match^ Regex::Match(String^ input, int startIndex, int length)
         {
-            int inputlength = (gcnew StringInfo(input))->LengthInTextElements;
+            int InputSize = input->Length;
             if(!input)
                 throw gcnew ArgumentNullException("input", "Value cannot be null.");
-            if(startIndex < 0 || startIndex > inputlength)
+            if(startIndex < 0 || startIndex > InputSize)
                 throw gcnew ArgumentOutOfRangeException("startIndex", "Start index cannot be less than 0 or greater than input length.");
-            if(length < 0 || length > inputlength)
+            if(length < 0 || length > InputSize)
                 throw gcnew ArgumentOutOfRangeException("length", "Length cannot be less than 0 or greater than input length.");
-            if(startIndex + length - 1 > inputlength)
+            if(startIndex + length - 1 > InputSize)
                 throw gcnew ArgumentOutOfRangeException("startIndex, length", "Start index and length combined cannot be greater than input length.");
 
             /* If in UTF-8 mode, convert the start and length values from String^ to char* offset. */
@@ -490,7 +519,7 @@ namespace Net
 
         _Match^ Regex::Match(String^ input, int startIndex)
         {
-            return this->Match(input, startIndex, (gcnew StringInfo(input))->LengthInTextElements - startIndex);
+            return this->Match(input, startIndex, input->Length - startIndex);
         }
 
 
@@ -502,7 +531,7 @@ namespace Net
 
         _Match^ Regex::Match(String^ input)
         {
-            return this->Match(input, 0, (gcnew StringInfo(input))->LengthInTextElements);
+            return this->Match(input, 0, input->Length);
         }
 
 
@@ -542,7 +571,7 @@ namespace Net
 
         MatchCollection^ Regex::Matches(String^ input, int startIndex)
         {
-            return gcnew MatchCollection(this->Match(input, startIndex, (gcnew StringInfo(input))->LengthInTextElements - startIndex));
+            return gcnew MatchCollection(this->Match(input, startIndex, input->Length - startIndex));
         }
 
 
@@ -554,7 +583,7 @@ namespace Net
 
         MatchCollection^ Regex::Matches(String^ input)
         {
-            return gcnew MatchCollection(this->Match(input, 0, (gcnew StringInfo(input))->LengthInTextElements));
+            return gcnew MatchCollection(this->Match(input, 0, input->Length));
         }
 
 
@@ -566,7 +595,7 @@ namespace Net
 
         MatchCollection^ Regex::Matches(String^ input, String^ pattern, RegexOptions options)
         {
-            return gcnew MatchCollection(Cache::FindOrCreate(pattern, options)->Match(input, 0, (gcnew StringInfo(input))->LengthInTextElements));
+            return gcnew MatchCollection(Cache::FindOrCreate(pattern, options)->Match(input, 0, input->Length));
         }
 
 
@@ -578,7 +607,7 @@ namespace Net
 
         MatchCollection^ Regex::Matches(String^ input, String^ pattern)
         {
-            return gcnew MatchCollection(Cache::FindOrCreate(pattern, RegexOptions::None)->Match(input, 0, (gcnew StringInfo(input))->LengthInTextElements));
+            return gcnew MatchCollection(Cache::FindOrCreate(pattern, RegexOptions::None)->Match(input, 0, input->Length));
         }
 
 

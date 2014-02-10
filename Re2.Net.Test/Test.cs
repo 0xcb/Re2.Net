@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using nn = System.Text.RegularExpressions;
 using rr = Re2.Net;
 
@@ -171,35 +172,52 @@ namespace Re2.Net.Test
                     new TestCase("Tom.{10,25}river|river.{10,25}Tom")
                 };
 
-                Console.Write("Running 'First Match' test..");
+                Console.Write("Running 'First Match' test...");
 
                 for(int i = 0; i < iterations; i++)
                     foreach(var testcase in testcases)
                     {
-                        Console.Write(".");
-
-                        var re2 = new rr.Regex(testcase.Pattern, rr.RegexOptions.Multiline);
-                        var net = new nn.Regex(testcase.Pattern, nn.RegexOptions.Multiline);
+                        var re2b = new rr.Regex(testcase.Pattern, rr.RegexOptions.Multiline | rr.RegexOptions.Latin1);
+                        var re2s = new rr.Regex(testcase.Pattern, rr.RegexOptions.Multiline);
+                        var nets = new nn.Regex(testcase.Pattern, nn.RegexOptions.Multiline);
 
                         watch.Start();
-                        var re2ByteMatch = re2.Match(haybytes);
+                        var re2ByteMatch = re2b.Match(haybytes);
                         testcase.AddRe2ByteResult(TimerTicksToMilliseconds(watch.ElapsedTicks));
                         watch.Reset();
 
                         watch.Start();
-                        var re2StringMatch = re2.Match(haystring);
+                        var re2StringMatch = re2s.Match(haystring);
                         testcase.AddRe2StringResult(TimerTicksToMilliseconds(watch.ElapsedTicks));
                         watch.Reset();
 
                         watch.Start();
-                        var netMatch = net.Match(haystring);
+                        var netMatch = nets.Match(haystring);
                         testcase.AddNETResult(TimerTicksToMilliseconds(watch.ElapsedTicks));
                         watch.Reset();
 
-                        Debug.Assert(re2ByteMatch.Value == re2StringMatch.Value);
-                        Debug.Assert(re2ByteMatch.Value == netMatch.Value);
-                        Debug.Assert(re2StringMatch.Index == netMatch.Index);
-                        Debug.Assert(re2StringMatch.Length == netMatch.Length);
+                        if(re2ByteMatch.Value != re2StringMatch.Value)
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("Match.Value: RE2 bytes failed to match RE2 string for pattern " + re2b.Pattern);
+                            Console.WriteLine("This is not necessarily an error and may be due to accent characters.");
+                            Console.WriteLine("RE2 bytes value: " + re2ByteMatch.Value);
+                            Console.WriteLine("RE2 string value: " + re2StringMatch.Value);
+                            Console.WriteLine();
+                        }
+
+                        if(re2StringMatch.Value != netMatch.Value)
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("Match.Value: RE2 string failed to match .NET string for pattern " + re2b.Pattern);
+                            Console.WriteLine("This is not necessarily an error and may be due to accent characters.");
+                            Console.WriteLine("RE2 string value: " + re2StringMatch.Value);
+                            Console.WriteLine(".NET string value: " + netMatch.Value);
+                            Console.WriteLine();
+                        }
+
+                        Assert.AreEqual(re2StringMatch.Index, netMatch.Index, "Match.Index: RE2 string, NET : " + re2b.Pattern);
+                        Assert.AreEqual(re2StringMatch.Length, netMatch.Length, "Match.Length: RE2 string, NET : " + re2b.Pattern);
                     }
 
                 Console.WriteLine("\n\nResults:\n\n");
@@ -211,39 +229,61 @@ namespace Re2.Net.Test
                 foreach(var testcase in testcases)
                     testcase.Reset();
 
-                Console.Write("\n\nRunning 'All Matches' test..");
+                Console.Write("\n\nRunning 'All Matches' test...");
 
                 for(int i = 0; i < iterations; i++)
                     foreach(var testcase in testcases)
                     {
-                        Console.Write(".");
-
-                        var re2 = new rr.Regex(testcase.Pattern, rr.RegexOptions.Multiline);
-                        var net = new nn.Regex(testcase.Pattern, nn.RegexOptions.Multiline);
+                        var re2b = new rr.Regex(testcase.Pattern, rr.RegexOptions.Multiline | rr.RegexOptions.Latin1);
+                        var re2s = new rr.Regex(testcase.Pattern, rr.RegexOptions.Multiline);
+                        var nets = new nn.Regex(testcase.Pattern, nn.RegexOptions.Multiline);
 
                         watch.Start();
-                        var re2ByteMatches = re2.Matches(haybytes);
+                        var re2ByteMatches = re2b.Matches(haybytes);
                         // Matches() methods are lazily evaluated.
                         testcase.Re2ByteMatchCount = re2ByteMatches.Count;
                         testcase.AddRe2ByteResult(TimerTicksToMilliseconds(watch.ElapsedTicks));
                         watch.Reset();
 
                         watch.Start();
-                        var re2StringMatches = re2.Matches(haystring);
+                        var re2StringMatches = re2s.Matches(haystring);
                         // Matches() methods are lazily evaluated.
                         testcase.Re2StringMatchCount = re2StringMatches.Count;
                         testcase.AddRe2StringResult(TimerTicksToMilliseconds(watch.ElapsedTicks));
                         watch.Reset();
 
                         watch.Start();
-                        var netMatches = net.Matches(haystring);
+                        var netMatches = nets.Matches(haystring);
                         // Matches() methods are lazily evaluated.
                         testcase.NETMatchCount = netMatches.Count;
                         testcase.AddNETResult(TimerTicksToMilliseconds(watch.ElapsedTicks));
                         watch.Reset();
 
-                        Debug.Assert(re2ByteMatches.Count == re2StringMatches.Count);
-                        Debug.Assert(re2ByteMatches.Count == netMatches.Count);
+                        Assert.AreEqual(re2ByteMatches.Count, re2StringMatches.Count, "Match.Count: RE2 bytes, RE2 string : " + re2b.Pattern);
+                        Assert.AreEqual(re2ByteMatches.Count, netMatches.Count, "Match.Count: RE2 bytes, NET : " + re2b.Pattern);
+
+                        for(int j = 0; j < re2ByteMatches.Count; j++)
+                        {
+                            if(re2ByteMatches[j].Value != re2StringMatches[j].Value)
+                            {
+                                Console.WriteLine();
+                                Console.WriteLine("Match.Value: RE2 bytes failed to match RE2 string for pattern " + re2b.Pattern);
+                                Console.WriteLine("This is not necessarily an error and may be due to accent characters.");
+                                Console.WriteLine("RE2 bytes value: " + re2ByteMatches[j].Value);
+                                Console.WriteLine("RE2 string value: " + re2StringMatches[j].Value);
+                                Console.WriteLine();
+                            }
+
+                            if(re2StringMatches[j].Value != netMatches[j].Value)
+                            {
+                                Console.WriteLine();
+                                Console.WriteLine("Match.Value: RE2 string failed to match .NET string for pattern " + re2b.Pattern);
+                                Console.WriteLine("This is not necessarily an error and may be due to accent characters.");
+                                Console.WriteLine("RE2 string value: " + re2StringMatches[j].Value);
+                                Console.WriteLine(".NET string value: " + netMatches[j].Value);
+                                Console.WriteLine();
+                            }
+                        }
                     }
 
                 Console.WriteLine("\n\nResults:\n\n");
@@ -257,6 +297,8 @@ namespace Re2.Net.Test
                 Console.WriteLine(ex.Message + ex.StackTrace);
             }
 
+            GC.Collect();
+            Console.WriteLine("Done.");
             Console.ReadLine();
         }
     }
