@@ -442,7 +442,7 @@ namespace Net
 
                 rv          = gcnew _Match(this, groupCount, input, inputIndex, capLength, charOffset + captures[0].length());
                 rv->_index  = inputIndex;
-                rv->_length = capLength;
+                rv->_length = captures[0].length();
 
                 GroupCollection^ groups = rv->Groups;
                 for(int i = 1; i < groupCount; i++)
