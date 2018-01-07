@@ -184,7 +184,7 @@
 
 #include <map>
 #include <string>
-#include "stdint.h"
+//#include "stdint.h"
 #include "stringpiece.h"
 #include "variadic_function.h"
 

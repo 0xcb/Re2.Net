@@ -10,6 +10,7 @@
     #include <stdlib.h>
     #include <malloc.h>
     #include <errno.h>
+    #include <iostream>
     #include "re2\src\re2.h"
     #include "re2\src\stringpiece.h"
 #pragma managed(pop)
@@ -50,60 +51,59 @@ namespace Net
 
             static StringPiece* stringToUTF8(const wchar_t* chars, int length)
             {
-                char* encoded = static_cast<char*>(malloc(length * sizeof(wchar_t)));
-                if(ENOMEM == errno)
-                    return nullptr;
+                /* 2 bytes of UTF-16 can require up to 3 bytes of UTF-8. */
+                char* encoded = static_cast<char*>(malloc(length * 3));
+                if(ENOMEM == errno) return nullptr;
 
                 int bufsize = 0;
-                for(int i = 0; i < length; ++i, ++bufsize)
+                for(int i = 0; i < length; ++i)
                 {
-                    wchar_t unitsub = chars[i] - 0xd800;
-                    int     codepoint;
+                    wchar_t u = chars[i] - 0xd800;
+                    int     c;
 
-                    if(!((unsigned)unitsub <= 0xdfff - 0xd800))
-                        codepoint = chars[i];
+                    if(!((unsigned)u <= 0xdfff - 0xd800))
+                        c = chars[i];
                     else
-                        codepoint = unitsub * 0x400 + chars[++i] + 0x2400;
+                        c = u * 0x400 + chars[++i] + 0x2400;
 
-                    if(codepoint < 0x0080)
-                        encoded[bufsize] = static_cast<char>(codepoint);
-                    else if(codepoint < 0x0800)
+                    if(c < 0x0080)
                     {
-                        encoded[bufsize]   = static_cast<char>(0xc0 + codepoint / 0x40);
-                        encoded[++bufsize] = static_cast<char>(0x80 + codepoint % 0x40);
+                        encoded[bufsize++] = static_cast<char>(c);
                     }
-                    else if(codepoint < 0x10000)
+                    else if(c < 0x0800)
                     {
-                        encoded[bufsize]   = static_cast<char>(0xe0 + codepoint / 0x1000);
-                        encoded[++bufsize] = static_cast<char>(0x80 + (codepoint % 0x1000) / 0x40);
-                        encoded[++bufsize] = static_cast<char>(0x80 + codepoint % 0x40);
+                        encoded[bufsize++] = static_cast<char>(0xc0 + c / 0x40);
+                        encoded[bufsize++] = static_cast<char>(0x80 + c % 0x40);
+                    }
+                    else if(c < 0x10000)
+                    {
+                        encoded[bufsize++] = static_cast<char>(0xe0 + c / 0x1000);
+                        encoded[bufsize++] = static_cast<char>(0x80 + (c % 0x1000) / 0x40);
+                        encoded[bufsize++] = static_cast<char>(0x80 + c % 0x40);
                     }
                     else
                     {
-                        encoded[bufsize]   = static_cast<char>(0xf0 + codepoint / 0x40000);
-                        encoded[++bufsize] = static_cast<char>(0x80 + (codepoint % 0x40000) / 0x1000);
-                        encoded[++bufsize] = static_cast<char>(0x80 + (codepoint % 0x1000) / 0x40);
-                        encoded[++bufsize] = static_cast<char>(0x80 + codepoint % 0x40);
+                        encoded[bufsize++] = static_cast<char>(0xf0 + c / 0x40000);
+                        encoded[bufsize++] = static_cast<char>(0x80 + (c % 0x40000) / 0x1000);
+                        encoded[bufsize++] = static_cast<char>(0x80 + (c % 0x1000) / 0x40);
+                        encoded[bufsize++] = static_cast<char>(0x80 + c % 0x40);
                     }
                 }
 
                 /* The memory block shouldn't need to be moved, but it's possible. */
                 encoded = static_cast<char*>(realloc(encoded, bufsize));
-                if(ENOMEM == errno)
-                    return nullptr;
+                if(ENOMEM == errno) return nullptr;
 
                 return new StringPiece(encoded, bufsize);
             }
 
         #pragma managed(pop)
 
-
         static StringPiece* StringToUTF8(String^ string)
         {
-            pin_ptr<const wchar_t> chars      = PtrToStringChars(string);
-            StringPiece*           converted = stringToUTF8(chars, string->Length);
-            if(!converted)
-                throw gcnew OutOfMemoryException();
+            pin_ptr<const wchar_t> chars = PtrToStringChars(string);
+            StringPiece* converted = stringToUTF8(chars, string->Length);
+            if(!converted) throw gcnew OutOfMemoryException();
             return converted;
         }
 
@@ -134,7 +134,10 @@ namespace Net
             Encoding^    Latin1 = Encoding::GetEncoding("ISO-8859-1");
             array<Byte>^ bytes  = Latin1->GetBytes(string);
             if(string != Latin1->GetString(bytes))
-                throw gcnew ArgumentOutOfRangeException(argument, "Specified argument was out of the range of valid Latin-1 values.");
+            {
+                throw gcnew ArgumentOutOfRangeException(argument,
+                    "Specified argument was out of the range of valid Latin-1 values.");
+            }
             pin_ptr<Byte> pinptr = &bytes[0];
             char* copy = static_cast<char*>(malloc(bytes->Length));
             if(ENOMEM == errno)
@@ -180,20 +183,30 @@ namespace Net
          *  Index of a Capture, Group, or Match is reported in terms of the entire input,
          *  regardless of startIndex or length.
          */
-        static int StrToCharPos(const char* input, int length)
+        static int StrToCharPos(const char* input, int utf8_length)
         {
-            length++;
             int rv = 0;
-            for(int i = 0; i < length; rv++)
-                /* Bits 0xxxxxxx and 11xxxxxx mark the start of a UTF-8 sequence. */
-                if((input[rv] & 0xc0) != 0x80)
+            for(int i = 0; i < utf8_length; ++i)
+            {
+                /* 0b1xxxxxxx marks the start of a UTF-8 sequence. */
+                if((input[rv] & 0x80))
                 {
-                    i++;
-                    /* The code point is outside the BMP (UTF-16 surrogate pair). */
-                    if((unsigned)input[i] >= 0xf0)
-                        i++;
+                    if((input[rv] & 0xe0) == 0xc0)
+                    {
+                        rv += 2;
+                    }
+                    else if((input[rv] & 0xf0) == 0xe0)
+                    {
+                        rv += 3;
+                    }
+                    else if((input[rv] & 0xf8) == 0xf0)
+                    {
+                        rv += 4;
+                    }
                 }
-            return rv - 1; /* Zero-based */
+                else rv++;
+            }
+            return rv;
         }
         
 
@@ -202,20 +215,32 @@ namespace Net
          *  because the Index of a Capture, Group, or Match is reported in terms of the
          *  entire input, regardless of startIndex or length.
          */
-        static int CharToStrPos(const char* input, int length)
+        static int CharToStrPos(const char* input, int char_length)
         {
-            length++;
             int rv = 0;
-            for(int i = 0; i < length; i++)
-                /* Bits 0xxxxxxx and 11xxxxxx mark the start of a UTF-8 sequence. */
-                if((input[rv] & 0xc0) != 0x80)
+            for(int i = 0; i < char_length; ++rv)
+            {
+                /* 0b1xxxxxxx marks the start of a UTF-8 sequence. */
+                if((input[i] & 0x80))
                 {
-                    rv++;
-                    /* The code point is outside the BMP (UTF-16 surrogate pair). */
-                    if((unsigned)input[i] >= 0xf0)
-                        rv++;
+                    if((input[i] & 0xe0) == 0xc0)
+                    {
+                        i += 2;
+                    }
+                    else if((input[i] & 0xf0) == 0xe0)
+                    {
+                        i += 3;
+                    }
+                    else if((input[i] & 0xf8) == 0xf0)
+                    {
+                        i += 4;
+                    }
+                    // else ...
+                    /* Input must be valid UTF-8 or i never increments. */
                 }
-            return rv - 1; /* Zero-based */
+                else i++;
+            }
+            return rv;
         }
 
         #pragma managed(pop)
@@ -420,7 +445,7 @@ namespace Net
 
         #pragma region Match
 
-        _Match^ Regex::_match(RegexInput^ input, int startIndex, int length, int stringStartIndex)
+        _Match^ Regex::_match(RegexInput^ input, int startIndex, int length, int strStartIndex)
         {
             /*
              *  stringStartIndex tracks inputIndex for String inputs between matches to avoid recalculating
@@ -437,12 +462,10 @@ namespace Net
                 /* Ignore the encoding of input byte arrays. */
                 bool isUtf8     = input->Bytes ? false : input->IsUTF8;
                 int  charOffset = static_cast<int>(captures[0].data() - haystack.data());
-                int  inputIndex = isUtf8 && charOffset ? CharToStrPos(haystack.data() + startIndex, charOffset - startIndex) + stringStartIndex : charOffset;
+                int  inputIndex = isUtf8 && charOffset ? CharToStrPos(haystack.data() + startIndex, charOffset - startIndex) + strStartIndex : charOffset;
                 int  capLength  = isUtf8 ? CharToStrPos(captures[0].data(), captures[0].length()) : captures[0].length();
 
-                rv          = gcnew _Match(this, groupCount, input, inputIndex, capLength, charOffset + captures[0].length());
-                rv->_index  = inputIndex;
-                rv->_length = capLength;
+                rv = gcnew _Match(this, groupCount, input, inputIndex, capLength, charOffset + captures[0].length());
 
                 GroupCollection^ groups = rv->Groups;
                 for(int i = 1; i < groupCount; i++)
@@ -454,10 +477,14 @@ namespace Net
                         /*
                          *  Match tracks the char offset and String index separately in case of UTF-8 String input, but
                          *  they will be the same if the input is a Byte array, or if the Regex is ASCII or Latin-1.
+                         *
+                         *  There's room here to optimize calculation of the group indices. Currently it jumps back to
+                         *  the beginning of the search for each group, instead of adding incrementally onto the
+                         *  previous group's calculation.
                          */
 
                         charOffset = static_cast<int>(captures[i].data() - haystack.data());
-                        inputIndex = isUtf8 && charOffset ? CharToStrPos(haystack.data() + startIndex, charOffset - startIndex) + stringStartIndex : charOffset;
+                        inputIndex = isUtf8 && charOffset ? CharToStrPos(haystack.data() + startIndex, charOffset - startIndex) + strStartIndex : charOffset;
                         capLength  = isUtf8 ? CharToStrPos(captures[i].data(), captures[i].length()) : captures[i].length();
 
                         groups[i] = gcnew Group(input, inputIndex, capLength);
@@ -488,14 +515,16 @@ namespace Net
 
             StringPiece* sp = ConvertStringEncoding(input, "input", this->Options);
             RegexInput^  ri = gcnew RegexInput(input, sp->data(), sp->length(), isUtf8);
+            delete sp;
 
+            int strStartIndex = startIndex;
             if(isUtf8)
             {
-                if(startIndex) startIndex = StrToCharPos(sp->data(), startIndex);
-                if(length)     length     = StrToCharPos(sp->data() + startIndex, length);
+                if(startIndex) startIndex = StrToCharPos(ri->Data, startIndex);
+                if(length)     length     = StrToCharPos(ri->Data + startIndex, length);
             }
 
-            return this->_match(ri, startIndex, length, 0);
+            return this->_match(ri, startIndex, length, strStartIndex);
         }
 
 

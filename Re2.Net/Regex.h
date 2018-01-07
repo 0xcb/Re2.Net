@@ -144,7 +144,7 @@ namespace Net
         private:
 
             /*
-             *  _re2 : The internal RE2 object. Don't call MemerwiseClone() on Regex instances.
+             *  _re2 : The internal RE2 object. Don't call MemberwiseClone() on Regex instances.
              *         (Note that the class itself is sealed to prevent users from doing this.)
              */
             const RE2* _re2;

@@ -31,3 +31,5 @@ Re2.Net/bin/
 Re2.Net.Test/bin/
 Re2.Net.Test/obj/
 !Re2.Net.Test/mtent12.txt
+*.db
+*.opendb
