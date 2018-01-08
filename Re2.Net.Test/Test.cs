@@ -141,8 +141,7 @@ namespace Re2.Net.Test
                     Console.WriteLine("Running issue #1 test ...");
                     string source = "red car white car";
                     string pattern = @"(\w+)\s+(car)";
-                    var regex = new rr.Regex(pattern);
-                    MatchCollection matches = regex.Matches(source);
+                    MatchCollection matches = Regex.Matches(source, pattern);
                     Debug.Assert(matches.Count == 2);
                     Debug.Assert(matches[0].Value == "red car");
                     Debug.Assert(matches[1].Value == "white car");
@@ -152,11 +151,10 @@ namespace Re2.Net.Test
 
 
                     Console.WriteLine("Running issue #2 test ...");
-                    string s = "123";
-                    var re2NetRegex = new rr.Regex(@"\d*");
-                    Debug.Assert(re2NetRegex.Match(s, 1).Index == 1);
-                    Debug.Assert(re2NetRegex.Match(s, 1).Length == 2);
-                    Debug.Assert(re2NetRegex.Match(s, 1).Value == "23");
+                    var r = new rr.Regex(@"\d*");
+                    Debug.Assert(r.Match("123", 1).Index == 1);
+                    Debug.Assert(r.Match("123", 1).Length == 2);
+                    Debug.Assert(r.Match("123", 1).Value == "23");
                     Console.WriteLine("\t... Success.\n");
 
                     Console.WriteLine("Running issue #3 test ...");
@@ -189,9 +187,23 @@ namespace Re2.Net.Test
                     // 2-byte UTF-16 to 3-byte UTF-8.
                     Debug.Assert(Regex.Match("水Ǆ", "水Ǆ").Length == 2);
                     Debug.Assert(Regex.Match(Encoding.UTF8.GetBytes("水Ǆ"), "水Ǆ").Length == 5);
-                    // To BMP and beyond.
-                    Debug.Assert(Regex.Match("xxx𠜎𠜱𠝹𠱓", "𠝹𠱓").Index == 5);
-                    Debug.Assert(Regex.Match("xxx𠜎𠜱𠝹𠱓", "𠜎𠜱𠝹𠱓").Length == 4);
+                    // To the BMP ... and beyond!
+                    Debug.Assert(Regex.Match("xx𠜎𠜱𠝹𠱓", "𠜎𠜱𠝹𠱓").Value == "𠜎𠜱𠝹𠱓");
+                    var r = new rr.Regex("𠝹𠱓");
+                    // Disallow beginning searches in the middle of a UTF-16 surrogate pair.
+                    bool exception = false;
+                    try
+                    {
+                        r.Match("𠜎𠜱𠝹𠱓", 1);
+                    }
+                    catch(ArgumentException)
+                    {
+                        exception = true;
+                    }
+                    // Indices and lengths are reported as UTF-16 code units.
+                    Debug.Assert(r.Match("𠜎水𠜱𠝹𠱓", 5).Index == 5);
+                    Debug.Assert(r.Match("𠜎水𠜱𠝹𠱓", 5).Length == 4);
+                    Debug.Assert(exception);
                     Console.WriteLine("\t... Success.\n");
                 }
 

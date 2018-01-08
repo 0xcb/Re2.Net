@@ -52,10 +52,10 @@ namespace Net
             static StringPiece* stringToUTF8(const wchar_t* chars, int length)
             {
                 /* 2 bytes of UTF-16 can require up to 3 bytes of UTF-8. */
-                char* encoded = static_cast<char*>(malloc(length * 3));
+                char* utf8 = static_cast<char*>(malloc(length * 3));
                 if(ENOMEM == errno) return nullptr;
 
-                int bufsize = 0;
+                int size = 0;
                 for(int i = 0; i < length; ++i)
                 {
                     wchar_t u = chars[i] - 0xd800;
@@ -66,35 +66,37 @@ namespace Net
                     else
                         c = u * 0x400 + chars[++i] + 0x2400;
 
+                    #pragma warning(disable:4244) 
                     if(c < 0x0080)
                     {
-                        encoded[bufsize++] = static_cast<char>(c);
+                        utf8[size++] = static_cast<char>(c);
                     }
                     else if(c < 0x0800)
                     {
-                        encoded[bufsize++] = static_cast<char>(0xc0 + c / 0x40);
-                        encoded[bufsize++] = static_cast<char>(0x80 + c % 0x40);
+                        utf8[size++] = 0xc0 | (c >> 6);
+                        utf8[size++] = 0x80 | (c & 0x3f);
                     }
                     else if(c < 0x10000)
                     {
-                        encoded[bufsize++] = static_cast<char>(0xe0 + c / 0x1000);
-                        encoded[bufsize++] = static_cast<char>(0x80 + (c % 0x1000) / 0x40);
-                        encoded[bufsize++] = static_cast<char>(0x80 + c % 0x40);
+                        utf8[size++] = 0xe0 | (c >> 12);
+                        utf8[size++] = 0x80 | ((c >> 6) & 0x3f);
+                        utf8[size++] = 0x80 | (c & 0x3f);
                     }
                     else
                     {
-                        encoded[bufsize++] = static_cast<char>(0xf0 + c / 0x40000);
-                        encoded[bufsize++] = static_cast<char>(0x80 + (c % 0x40000) / 0x1000);
-                        encoded[bufsize++] = static_cast<char>(0x80 + (c % 0x1000) / 0x40);
-                        encoded[bufsize++] = static_cast<char>(0x80 + c % 0x40);
+                        utf8[size++] = 0xf0 | (c >> 18);
+                        utf8[size++] = 0x80 | ((c >> 12) & 0x3f);
+                        utf8[size++] = 0x80 | ((c >> 6) & 0x3f);
+                        utf8[size++] = 0x80 | (c & 0x3f);
                     }
+                    #pragma warning(default:4244)
                 }
 
                 /* The memory block shouldn't need to be moved, but it's possible. */
-                encoded = static_cast<char*>(realloc(encoded, bufsize));
+                utf8 = static_cast<char*>(realloc(utf8, size));
                 if(ENOMEM == errno) return nullptr;
 
-                return new StringPiece(encoded, bufsize);
+                return new StringPiece(utf8, size);
             }
 
         #pragma managed(pop)
@@ -183,10 +185,10 @@ namespace Net
          *  Index of a Capture, Group, or Match is reported in terms of the entire input,
          *  regardless of startIndex or length.
          */
-        static int StrToCharPos(const char* input, int utf8_length)
+        static int StrToCharPos(const char* input, int utf16_length)
         {
             int rv = 0;
-            for(int i = 0; i < utf8_length; ++i)
+            for(int i = 0; i < utf16_length; ++i)
             {
                 /* 0b1xxxxxxx marks the start of a UTF-8 sequence. */
                 if((input[rv] & 0x80))
@@ -202,6 +204,14 @@ namespace Net
                     else if((input[rv] & 0xf8) == 0xf0)
                     {
                         rv += 4;
+                        /*
+                         *  .NET strings are counted in UTF-16 code units, not Unicode code
+                         *  points. The two differ only outside the BMP, i.e. this case.
+                         *
+                         *  Since StrToCharPos goes by .NET string length, i is double-
+                         *  incremented to include both UTF-16 surrogates.
+                         */
+                        i++;
                     }
                 }
                 else rv++;
@@ -234,6 +244,14 @@ namespace Net
                     else if((input[i] & 0xf8) == 0xf0)
                     {
                         i += 4;
+                        /*
+                         *  .NET strings are counted in UTF-16 code units, not Unicode code
+                         *  points. The two differ only outside the BMP, i.e. this case.
+                         *
+                         *  Since CharToStrPos goes by C string length, rv is double-
+                         *  incremented to include both UTF-16 surrogates.
+                         */
+                        rv++;
                     }
                     // else ...
                     /* Input must be valid UTF-8 or i never increments. */
@@ -509,7 +527,13 @@ namespace Net
                 throw gcnew ArgumentOutOfRangeException("length", "Length cannot be less than 0 or greater than input length.");
             if(startIndex + length - 1 > InputSize)
                 throw gcnew ArgumentOutOfRangeException("startIndex, length", "Start index and length combined cannot be greater than input length.");
-
+            if(startIndex > 0)
+            {
+                pin_ptr<const wchar_t> chars = PtrToStringChars(input);
+                if((((char*)(&chars[startIndex]))[1] & 0xdc) == 0xdc)
+                    throw gcnew ArgumentException("startIndex", "Start index cannot bisect a UTF-16 surrogate pair.");
+            }
+            
             /* If in UTF-8 mode, convert the start and length values from String^ to char* offset. */
             bool isUtf8 = !RegexOption::HasAnyFlag(this->Options, SINGLE_BYTE_ENCODING);
 
