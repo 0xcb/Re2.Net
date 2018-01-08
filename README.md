@@ -29,19 +29,21 @@ For a list of things that Re2.Net doesn't support (yet), see [below](#missing).
 
 #### Platforms
 
-Re2.Net targets .NET Framework 3.5 and is compiled using the Visual C++ 2008 runtime, so it has plenty of backwards compatibility for the enterprise environments where .NET is so popular. x86 and x64 platforms are both supported, but because the underlying RE2 library is unmanaged code, each platform requires its own DLL (this will change to a single DLL at some point).
+Re2.Net now targets .NET Framework 4.5.2 and is compiled using the Visual C++ 2015 runtime (VC140). It still compiles under .NET 3.5 and Visual C++ 2008 as well.
+
+x86 and x64 platforms are both supported, but because the underlying RE2 library is unmanaged code, each platform requires its own DLL.
 
 
 #### License
 
-Re2.Net is distributed under the [GNU Affero General Public License, Version 3](http://www.gnu.org/licenses/agpl-3.0.html) (RE2 by itself is distributed under a more permissive [BSD-style license](http://re2.googlecode.com/hg/LICENSE)). If you're interested in using Re2.Net but find the terms of the AGPLv3 too restrictive, contact me at <coltblackmore+re2.net@gmail.com>.
+Re2.Net is now distributed under the same permissive 3-clause BSD license as RE2 itself. If for some reason those terms still don't work for you, contact me at <coltblackmore+re2.net@gmail.com>.
 
 
-#### <a name="binaries"/>Binaries ([Download](https://drive.google.com/file/d/0B9Jv-lX2VrxfcksxenQzelk0aG8/edit?usp=sharing))
+#### <a name="binaries"/>Binaries ([Download](https://github.com/0xcb/Re2.Net/releases))
 
 Building C++/CLI from source can be a finicky process, especially with older .NET versions (like 3.5) and VC++ compilers (like 2008). If you just want binaries, use the Download link above. The LICENSES file and XML documentation are included.
 
-If you *are* interested in building from source, see the **C++/CLI Notes** and **Lib Requirements** sections at the top of ``Regex.h``. Note that despite targeting .NET 3.5 and compiling with VC++ 2008, the Re2.Net solution files are for Visual Studio 2012 (the free Express edition works just fine).
+If you *are* interested in building from source, see the **C++/CLI Notes** and **Lib Requirements** sections at the top of ``Regex.h``. It all seems to work much better in recent versions of Visual Studio.
 
 
 ## <a name="comparison"/> Re2.Net vs .NET Regex
