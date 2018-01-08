@@ -82,14 +82,8 @@
     <ClInclude Include="Regex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="resource.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="LICENSES" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="Re2.Net.rc" />
   </ItemGroup>
 </Project>

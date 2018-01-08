@@ -22,11 +22,11 @@ using namespace System::Security::Permissions;
 [assembly:AssemblyCopyrightAttribute("Re2.Net Copyright © 2014 Colt Blackmore, RE2 Copyright © 2003-2009 The RE2 Authors")];
 [assembly:AssemblyTrademarkAttribute("")];
 [assembly:AssemblyCultureAttribute("")];
-#if _DEBUG
-    [assembly: AssemblyConfiguration("Debug")]
-#else
-    [assembly: AssemblyConfiguration("Release")]
-#endif
+//#if _DEBUG
+//    [assembly: AssemblyConfiguration("Debug")]
+//#else
+//    [assembly: AssemblyConfiguration("Release")]
+//#endif
 
 //
 // Version information for an assembly consists of the following four values:
@@ -45,4 +45,4 @@ using namespace System::Security::Permissions;
 
 [assembly:CLSCompliantAttribute(true)];
 
-[assembly:SecurityPermission(SecurityAction::RequestMinimum, UnmanagedCode = true)];
+//[assembly:SecurityPermission(SecurityAction::RequestMinimum, UnmanagedCode = true)];
