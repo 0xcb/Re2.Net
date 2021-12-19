@@ -16,9 +16,10 @@ namespace Re2
 {
 namespace Net
 {
-    MatchCollection::MatchCollection(Match^ match)
+    MatchCollection::MatchCollection(Match^ match, int length)
     {
         _match   = match;
+        _length  = length;
         _matches = gcnew ArrayList();
         _done    = !match->Success;
         if(!_done)
@@ -39,7 +40,7 @@ namespace Net
         do
         {
             _match = _match->NextMatch();
-            if(!_match->Success)
+            if(!_match->Success || _match->Index + _match->Length > _length)
             {
                 _done = true;
                 return nullptr;

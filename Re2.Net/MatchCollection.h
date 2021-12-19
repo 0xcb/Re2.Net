@@ -36,6 +36,7 @@ namespace Net
         internal:
 
             int        _done;
+            int        _length;
             Match^     _match;
             ArrayList^ _matches;
         
