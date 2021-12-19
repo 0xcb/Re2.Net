@@ -622,27 +622,39 @@ namespace Net
 
         #pragma region Matches
 
+        MatchCollection^ Regex::Matches(String^ input, int startIndex, int length)
+        {
+            return gcnew MatchCollection(this->Match(input, startIndex, length), length);
+        }
+
+
+        MatchCollection^ Regex::Matches(array<Byte>^ input, int startIndex, int length)
+        {
+            return gcnew MatchCollection(this->Match(input, startIndex, length), length);
+        }
+
+
         MatchCollection^ Regex::Matches(String^ input, int startIndex)
         {
-            return gcnew MatchCollection(this->Match(input, startIndex, input->Length - startIndex));
+            return gcnew MatchCollection(this->Match(input, startIndex, input->Length - startIndex), input->Length - startIndex);
         }
 
 
         MatchCollection^ Regex::Matches(array<Byte>^ input, int startIndex)
         {
-            return gcnew MatchCollection(this->Match(input, startIndex, input->Length - startIndex));
+            return gcnew MatchCollection(this->Match(input, startIndex, input->Length - startIndex), input->Length - startIndex);
         }
 
 
         MatchCollection^ Regex::Matches(String^ input)
         {
-            return gcnew MatchCollection(this->Match(input, 0, input->Length));
+            return gcnew MatchCollection(this->Match(input, 0, input->Length), input->Length);
         }
 
 
         MatchCollection^ Regex::Matches(array<Byte>^ input)
         {
-            return gcnew MatchCollection(this->Match(input, 0, input->Length));
+            return gcnew MatchCollection(this->Match(input, 0, input->Length), input->Length);
         }
 
 

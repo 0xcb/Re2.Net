@@ -667,6 +667,50 @@ namespace Net
                 /// </summary>
                 /// <param name="input">The string to search for a match.</param>
                 /// <param name="startIndex">The input index at which to start the search.</param>
+                /// <param name="length">The input length at which to end the search.</param>
+                /// <returns>
+                ///     A collection of the <see cref="Re2::Net::Match"/> objects found by the search. If no matches are found, the method
+                ///     returns an empty collection object.
+                /// </returns>
+                /// <exception cref="System::ArgumentNullException">
+                ///     <paramref name="input"/> is <c>null</c>.
+                /// </exception>
+                /// <exception cref="System::ArgumentOutOfRangeException">
+                ///     <para><paramref name="startIndex"/> is less than zero or greater than the length of <paramref name="input"/>.</para>
+                ///     <para>- or -</para>
+                ///     <para><paramref name="input"/> is not a valid Latin-1 string (flag <c>RegexOptions.Latin1</c> is set).</para>
+                ///     <para>- or -</para>
+                ///     <para><paramref name="input"/> is not a valid ASCII string (flag <c>RegexOptions.ASCII</c> is set).</para>
+                /// </exception>
+                MatchCollection^ Matches(String^ input, int startIndex, int length);
+
+
+                /// <summary>
+                ///     Searches the specified input byte array for all occurrences of a regular expression, beginning at the specified
+                ///     starting position.
+                /// </summary>
+                /// <param name="input">The byte array to search for a match.</param>
+                /// <param name="startIndex">The input index at which to start the search.</param>
+                /// <param name="length">The input length at which to end the search.</param>
+                /// <returns>
+                ///     A collection of the <see cref="Re2::Net::Match"/> objects found by the search. If no matches are found, the method
+                ///     returns an empty collection object.
+                /// </returns>
+                /// <exception cref="System::ArgumentNullException">
+                ///     <paramref name="input"/> is <c>null</c>.
+                /// </exception>
+                /// <exception cref="System::ArgumentOutOfRangeException">
+                ///     <paramref name="startIndex"/> is less than zero or greater than the length of <paramref name="input"/>.
+                /// </exception>
+                MatchCollection^ Matches(array<Byte>^ input, int startIndex, int length);
+
+
+                /// <summary>
+                ///     Searches the specified input string for all occurrences of a regular expression, beginning at the specified
+                ///     starting position in the string.
+                /// </summary>
+                /// <param name="input">The string to search for a match.</param>
+                /// <param name="startIndex">The input index at which to start the search.</param>
                 /// <returns>
                 ///     A collection of the <see cref="Re2::Net::Match"/> objects found by the search. If no matches are found, the method
                 ///     returns an empty collection object.
